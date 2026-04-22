@@ -117,8 +117,9 @@ public class CartService {
      * Obtenir le panier complet de l'utilisateur
      */
     public CartResponse getCart(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        if (!userRepository.existsById(userId)) {
+            throw new ResourceNotFoundException("User not found");
+        }
 
         List<CartItem> cartItems = cartItemRepository.findByUserId(userId);
         List<CartItemResponse> items = cartItems.stream()
@@ -142,8 +143,9 @@ public class CartService {
      * Vider le panier
      */
     public void clearCart(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        if (!userRepository.existsById(userId)) {
+            throw new ResourceNotFoundException("User not found");
+        }
 
         cartItemRepository.deleteByUserId(userId);
     }
