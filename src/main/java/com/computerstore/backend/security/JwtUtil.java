@@ -31,6 +31,12 @@ public class JwtUtil {
         return createToken(claims, userDetails.getUsername());
     }
 
+    public String generateToken(UserDetails userDetails, Long userId) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("userId", userId);
+        return createToken(claims, userDetails.getUsername());
+    }
+
     private String createToken(Map<String, Object> claims, String subject) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpirationMs);
@@ -46,6 +52,18 @@ public class JwtUtil {
 
     public String getUsernameFromToken(String token) {
         return getClaimsFromToken(token).getSubject();
+    }
+
+    public Long getUserIdFromToken(String token) {
+        Claims claims = getClaimsFromToken(token);
+        Object userId = claims.get("userId");
+        if (userId != null) {
+            if (userId instanceof Integer) {
+                return ((Integer) userId).longValue();
+            }
+            return (Long) userId;
+        }
+        return null;
     }
 
     public boolean isTokenValid(String token) {

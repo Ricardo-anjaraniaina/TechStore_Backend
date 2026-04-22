@@ -46,13 +46,14 @@ public class AuthService {
 
         User savedUser = userRepository.save(user);
 
-        // Generate token
+        // Generate token with userId
         String token = jwtUtil.generateToken(
                 new org.springframework.security.core.userdetails.User(
                         savedUser.getUsername(),
                         savedUser.getPassword(),
                         java.util.Collections.emptyList()
-                )
+                ),
+                savedUser.getId()
         );
 
         return buildAuthResponse(token, savedUser);
@@ -70,13 +71,14 @@ public class AuthService {
             throw new RuntimeException("User account is disabled");
         }
 
-        // Generate token
+        // Generate token with userId
         String token = jwtUtil.generateToken(
                 new org.springframework.security.core.userdetails.User(
                         user.getUsername(),
                         user.getPassword(),
                         java.util.Collections.emptyList()
-                )
+                ),
+                user.getId()
         );
 
         return buildAuthResponse(token, user);
