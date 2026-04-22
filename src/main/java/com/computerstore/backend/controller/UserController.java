@@ -1,6 +1,7 @@
 package com.computerstore.backend.controller;
 
 import com.computerstore.backend.dto.UserDTO;
+import com.computerstore.backend.security.UserPrincipal;
 import com.computerstore.backend.service.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,12 +21,12 @@ public class UserController {
     @GetMapping("/me")
     public ResponseEntity<UserDTO> getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
+        if (authentication == null || !(authentication.getPrincipal() instanceof UserPrincipal)) {
             return ResponseEntity.status(401).build();
         }
 
-        String username = authentication.getName();
-        UserDTO user = userService.getUserByUsername(username);
+        UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
+        UserDTO user = userService.getUserById(principal.getId());
         return ResponseEntity.ok(user);
     }
 
