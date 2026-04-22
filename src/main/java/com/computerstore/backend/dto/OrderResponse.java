@@ -5,18 +5,17 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import com.computerstore.backend.entity.OrderStatus;
-
 import lombok.Data;
 
 @Data
 public class OrderResponse {
     private Long id;
     private String orderNumber;
-    private String customerEmail;
-    private String customerName;
-    private String customerPhone;
+    private String userEmail;
     private OrderStatus status;
     private BigDecimal totalAmount;
+    private String shippingAddress;
+    private String billingAddress;
     private LocalDateTime createdAt;
     private List<OrderItemResponse> items;
 }
