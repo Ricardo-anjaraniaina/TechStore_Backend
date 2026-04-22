@@ -8,6 +8,7 @@ import com.computerstore.backend.dto.ProductRequest;
 import com.computerstore.backend.dto.ProductResponse;
 import com.computerstore.backend.entity.Category;
 import com.computerstore.backend.entity.Product;
+import com.computerstore.backend.exception.ResourceNotFoundException;
 import com.computerstore.backend.repository.CategoryRepository;
 import com.computerstore.backend.repository.ProductRepository;
 
@@ -22,7 +23,7 @@ public class ProductServiceImpl implements ProductService {
     @Override
     public ProductResponse createProduct(ProductRequest request) {
         Category category = categoryRepository.findById(request.getCategoryId())
-            .orElseThrow(() -> new RuntimeException("categorie non trouvée"));
+            .orElseThrow(() -> new ResourceNotFoundException("Catégorie non trouvée"));
 
         Product product = new Product();
         product.setName(request.getName());
@@ -48,17 +49,17 @@ public class ProductServiceImpl implements ProductService {
     @Override
     public ProductResponse getProductById(Long id) {
         Product product = productRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
+            .orElseThrow(() -> new ResourceNotFoundException("Produit non trouvé"));
         return toResponse(product);
     }
 
     @Override
     public ProductResponse updateProduct(Long id, ProductRequest request) {
         Product product = productRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
+            .orElseThrow(() -> new ResourceNotFoundException("Produit non trouvé"));
 
         Category category = categoryRepository.findById(request.getCategoryId())
-            .orElseThrow(() -> new RuntimeException("Catégorie non trouvée"));
+            .orElseThrow(() -> new ResourceNotFoundException("Catégorie non trouvée"));
 
         product.setName(request.getName());
         product.setDescription(request.getDescription());
@@ -74,7 +75,7 @@ public class ProductServiceImpl implements ProductService {
     @Override
     public void deleteProduct(Long id) {
         if (!productRepository.existsById(id)) {
-            throw new RuntimeException("Produit non trouvé");
+            throw new ResourceNotFoundException("Produit non trouvé");
         }
         productRepository.deleteById(id);
     }
