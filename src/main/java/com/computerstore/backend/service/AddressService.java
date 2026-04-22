@@ -63,8 +63,9 @@ public class AddressService {
      * Récupérer toutes les adresses d'un utilisateur
      */
     public List<AddressResponse> getAddressesByUserId(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        if (!userRepository.existsById(userId)) {
+            throw new ResourceNotFoundException("User not found");
+        }
 
         return addressRepository.findByUserId(userId).stream()
                 .map(this::convertToResponse)
