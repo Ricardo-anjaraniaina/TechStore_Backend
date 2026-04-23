@@ -15,7 +15,7 @@ public class CreateOrderRequest {
     @NotNull(message = "Billing address ID is required")
     private Long billingAddressId;
 
-    private String paymentMethod; // CREDIT_CARD, DEBIT_CARD, PAYPAL
+    private String paymentMethod; // CREDIT_CARD, MVOLA, ORANGE_MONEY, AIRTEL_MONEY
 
     private String notes;
 
