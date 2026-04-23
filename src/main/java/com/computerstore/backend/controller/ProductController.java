@@ -6,13 +6,14 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestBody;
 
+import com.computerstore.backend.dto.PageResponse;
 import com.computerstore.backend.service.ProductService;
 import com.computerstore.backend.dto.ProductRequest;
 import com.computerstore.backend.dto.ProductResponse;
-import java.util.List;
 
 
 import lombok.RequiredArgsConstructor;
@@ -24,8 +25,12 @@ public class ProductController {
     private final ProductService productService;
 
     @GetMapping
-    public List<ProductResponse> getAllProduct() {
-        return productService.getAllProduct();
+    public PageResponse<ProductResponse> getProducts(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "asc") String sortDir) {
+        return productService.getProductsPaginated(page, size, sortBy, sortDir);
     }
 
     @GetMapping("/{id}")
