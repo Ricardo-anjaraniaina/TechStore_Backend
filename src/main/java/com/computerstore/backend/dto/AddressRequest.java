@@ -26,7 +26,7 @@ public class AddressRequest {
     private String state;
 
     @NotBlank(message = "Zip code is required")
-    @Pattern(regexp = "^[0-9]{5}(-[0-9]{4})?$", message = "Invalid zip code format")
+    @Pattern(regexp = "^[0-9]{3}$", message = "Le code postal malgache doit contenir 3 chiffres")
     private String zipCode;
 
     @NotBlank(message = "Country is required")
