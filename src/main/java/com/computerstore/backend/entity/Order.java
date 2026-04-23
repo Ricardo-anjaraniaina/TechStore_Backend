@@ -27,8 +27,19 @@ public class Order {
     private String orderNumber;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id")
+    @JoinColumn(name = "user_id", nullable = false)
     private User user;
+
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<OrderItem> items = new ArrayList<>();
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "shipping_address_id", nullable = false)
+    private Address shippingAddress;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "billing_address_id", nullable = false)
+    private Address billingAddress;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -37,14 +48,19 @@ public class Order {
     @Column(name = "total_amount", nullable = false)
     private BigDecimal totalAmount;
 
-    @Column(name = "shipping_address", nullable = false)
-    private String shippingAddress;
+    @Column(name = "shipping_fee")
+    private BigDecimal shippingFee = BigDecimal.ZERO;
 
-    @Column(name = "billing_address", nullable = false)
-    private String billingAddress;
+    @Column(name = "tax_amount")
+    private BigDecimal taxAmount = BigDecimal.ZERO;
 
-    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<OrderItem> items = new ArrayList<>();
+    private String paymentMethod;
+
+    @Column(name = "tracking_number")
+    private String trackingNumber;
+
+    @Column(name = "notes")
+    private String notes;
 
     @CreationTimestamp
     @Column(name = "created_at")
@@ -53,4 +69,22 @@ public class Order {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
-}
+
+    @Column(name = "shipped_at")
+    private LocalDateTime shippedAt;
+
+    @Column(name = "delivered_at")
+    private LocalDateTime deliveredAt;
+
+    // Méthodes utilitaires
+    public BigDecimal getSubtotal() {
+        return items.stream()
+                .map(item -> item.getUnitPrice().multiply(new BigDecimal(item.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    public void calculateTotal() {
+        BigDecimal subtotal = getSubtotal();
+        this.totalAmount = subtotal.add(shippingFee != null ? shippingFee : BigDecimal.ZERO)
+                                    .add(taxAmount != null ? taxAmount : BigDecimal.ZERO);
+}}

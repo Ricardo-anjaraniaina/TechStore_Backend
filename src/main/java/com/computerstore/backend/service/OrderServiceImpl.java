@@ -1,29 +1,20 @@
 package com.computerstore.backend.service;
 
-import java.math.BigDecimal;
-import java.util.List;
-import java.util.UUID;
-
+import com.computerstore.backend.dto.AddressResponse;
+import com.computerstore.backend.dto.CreateOrderRequest;
+import com.computerstore.backend.dto.OrderItemResponse;
+import com.computerstore.backend.dto.OrderResponse;
+import com.computerstore.backend.dto.UpdateOrderStatusRequest;
+import com.computerstore.backend.entity.*;
+import com.computerstore.backend.exception.ResourceNotFoundException;
+import com.computerstore.backend.repository.*;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.computerstore.backend.dto.OrderItemResponse;
-import com.computerstore.backend.dto.OrderRequest;
-import com.computerstore.backend.dto.OrderResponse;
-import com.computerstore.backend.entity.Address;
-import com.computerstore.backend.entity.CartItem;
-import com.computerstore.backend.entity.Order;
-import com.computerstore.backend.entity.OrderItem;
-import com.computerstore.backend.entity.OrderStatus;
-import com.computerstore.backend.entity.User;
-import com.computerstore.backend.exception.ResourceNotFoundException;
-import com.computerstore.backend.repository.AddressRepository;
-import com.computerstore.backend.repository.CartItemRepository;
-import com.computerstore.backend.repository.OrderRepository;
-import com.computerstore.backend.repository.ProductRepository;
-import com.computerstore.backend.repository.UserRepository;
-
-import lombok.RequiredArgsConstructor;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -37,7 +28,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
-    public OrderResponse checkout(Long userId, OrderRequest request) {
+    public OrderResponse createOrder(Long userId, CreateOrderRequest request) {
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new ResourceNotFoundException("Utilisateur non trouvé"));
 
@@ -55,13 +46,14 @@ public class OrderServiceImpl implements OrderService {
         Order order = new Order();
         order.setOrderNumber("ORD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
         order.setUser(user);
-        order.setShippingAddress(formatAddress(shipping));
-        order.setBillingAddress(formatAddress(billing));
+        order.setShippingAddress(shipping);
+        order.setBillingAddress(billing);
         order.setStatus(OrderStatus.PENDING);
+        order.setPaymentMethod(request.getPaymentMethod());
+        order.setNotes(request.getNotes());
 
-        BigDecimal total = BigDecimal.ZERO;
         for (CartItem cartItem : cartItems) {
-            var product = cartItem.getProduct();
+            Product product = cartItem.getProduct();
 
             if (product.getStockQuantity() < cartItem.getQuantity()) {
                 throw new IllegalStateException("Stock insuffisant pour: " + product.getName());
@@ -75,72 +67,95 @@ public class OrderServiceImpl implements OrderService {
             item.setProduct(product);
             item.setQuantity(cartItem.getQuantity());
             item.setUnitPrice(cartItem.getPrice());
-
             order.getItems().add(item);
-            total = total.add(cartItem.getSubtotal());
         }
 
-        order.setTotalAmount(total);
+        order.calculateTotal();
         Order saved = orderRepository.save(order);
-
         cartItemRepository.deleteByUserId(userId);
 
         return toResponse(saved);
     }
 
     @Override
-    public List<OrderResponse> getAllOrders() {
-        return orderRepository.findAll().stream().map(this::toResponse).toList();
+    public List<OrderResponse> getUserOrders(Long userId) {
+        return orderRepository.findByUserIdOrderByCreatedAtDesc(userId)
+            .stream().map(this::toResponse).toList();
     }
 
     @Override
-    public List<OrderResponse> getOrdersByUser(Long userId) {
-        return orderRepository.findByUserId(userId).stream().map(this::toResponse).toList();
-    }
-
-    @Override
-    public OrderResponse getOrderById(Long id) {
-        return toResponse(findOrder(id));
+    public OrderResponse getOrderById(Long userId, Long orderId) {
+        Order order = orderRepository.findByIdAndUserId(orderId, userId)
+            .orElseThrow(() -> new ResourceNotFoundException("Commande non trouvée"));
+        return toResponse(order);
     }
 
     @Override
     @Transactional
-    public OrderResponse updateStatus(Long id, OrderStatus status) {
-        Order order = findOrder(id);
-        order.setStatus(status);
+    public OrderResponse updateOrderStatus(Long userId, Long orderId, UpdateOrderStatusRequest request) {
+        Order order = orderRepository.findByIdAndUserId(orderId, userId)
+            .orElseThrow(() -> new ResourceNotFoundException("Commande non trouvée"));
+
+        OrderStatus newStatus = OrderStatus.valueOf(request.getStatus().toUpperCase());
+        order.setStatus(newStatus);
+
+        if (request.getTrackingNumber() != null) {
+            order.setTrackingNumber(request.getTrackingNumber());
+        }
+        if (newStatus == OrderStatus.SHIPPED) {
+            order.setShippedAt(LocalDateTime.now());
+        }
+        if (newStatus == OrderStatus.DELIVERED) {
+            order.setDeliveredAt(LocalDateTime.now());
+        }
+
         return toResponse(orderRepository.save(order));
     }
 
     @Override
     @Transactional
-    public void deleteOrder(Long id) {
-        if (!orderRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Commande non trouvée");
-        }
-        orderRepository.deleteById(id);
-    }
-
-    private Order findOrder(Long id) {
-        return orderRepository.findById(id)
+    public OrderResponse cancelOrder(Long userId, Long orderId) {
+        Order order = orderRepository.findByIdAndUserId(orderId, userId)
             .orElseThrow(() -> new ResourceNotFoundException("Commande non trouvée"));
+
+        if (order.getStatus() == OrderStatus.SHIPPED || order.getStatus() == OrderStatus.DELIVERED) {
+            throw new IllegalStateException("Impossible d'annuler une commande déjà expédiée ou livrée");
+        }
+
+        // Remettre le stock
+        for (OrderItem item : order.getItems()) {
+            Product product = item.getProduct();
+            product.setStockQuantity(product.getStockQuantity() + item.getQuantity());
+            productRepository.save(product);
+        }
+
+        order.setStatus(OrderStatus.CANCELLED);
+        return toResponse(orderRepository.save(order));
     }
 
-    private String formatAddress(Address a) {
-        return a.getFirstName() + " " + a.getLastName() + ", " +
-               a.getStreet() + ", " + a.getCity() + " " + a.getZipCode() + ", " +
-               a.getState() + ", " + a.getCountry();
+    @Override
+    public List<OrderResponse> getOrdersByStatus(OrderStatus status) {
+        return orderRepository.findByStatus(status)
+            .stream().map(this::toResponse).toList();
     }
 
     private OrderResponse toResponse(Order order) {
         OrderResponse response = new OrderResponse();
         response.setId(order.getId());
         response.setOrderNumber(order.getOrderNumber());
-        response.setUserEmail(order.getUser().getEmail());
-        response.setStatus(order.getStatus());
+        response.setStatus(order.getStatus().name());
+        response.setSubtotal(order.getSubtotal());
+        response.setShippingFee(order.getShippingFee());
+        response.setTaxAmount(order.getTaxAmount());
         response.setTotalAmount(order.getTotalAmount());
-        response.setShippingAddress(order.getShippingAddress());
-        response.setBillingAddress(order.getBillingAddress());
+        response.setPaymentMethod(order.getPaymentMethod());
+        response.setTrackingNumber(order.getTrackingNumber());
+        response.setNotes(order.getNotes());
         response.setCreatedAt(order.getCreatedAt());
+        response.setShippedAt(order.getShippedAt());
+        response.setDeliveredAt(order.getDeliveredAt());
+        response.setShippingAddress(toAddressResponse(order.getShippingAddress()));
+        response.setBillingAddress(toAddressResponse(order.getBillingAddress()));
         response.setItems(order.getItems().stream().map(this::toItemResponse).toList());
         return response;
     }
@@ -148,10 +163,29 @@ public class OrderServiceImpl implements OrderService {
     private OrderItemResponse toItemResponse(OrderItem item) {
         OrderItemResponse response = new OrderItemResponse();
         response.setId(item.getId());
+        response.setProductId(item.getProduct().getId());
         response.setProductName(item.getProduct().getName());
+        response.setProductImage(item.getProduct().getImageUrl());
         response.setQuantity(item.getQuantity());
         response.setUnitPrice(item.getUnitPrice());
-        response.setTotalPrice(item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity())));
+        response.setSubtotal(item.getUnitPrice().multiply(java.math.BigDecimal.valueOf(item.getQuantity())));
+        return response;
+    }
+
+    private AddressResponse toAddressResponse(Address address) {
+        AddressResponse response = new AddressResponse();
+        response.setId(address.getId());
+        response.setFirstName(address.getFirstName());
+        response.setLastName(address.getLastName());
+        response.setStreet(address.getStreet());
+        response.setCity(address.getCity());
+        response.setState(address.getState());
+        response.setZipCode(address.getZipCode());
+        response.setCountry(address.getCountry());
+        response.setPhoneNumber(address.getPhoneNumber());
+        response.setIsDefault(address.getIsDefault());
+        response.setAddressType(address.getAddressType());
+        response.setInstructions(address.getInstructions());
         return response;
     }
 }

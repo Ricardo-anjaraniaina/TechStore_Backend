@@ -2,8 +2,12 @@ package com.computerstore.backend.service;
 
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
+import com.computerstore.backend.dto.PageResponse;
 import com.computerstore.backend.dto.ProductRequest;
 import com.computerstore.backend.dto.ProductResponse;
 import com.computerstore.backend.entity.Category;
@@ -36,6 +40,15 @@ public class ProductServiceImpl implements ProductService {
         Product saved = productRepository.save(product);
 
         return toResponse(saved);
+    }
+
+    @Override
+    public PageResponse<ProductResponse> getProductsPaginated(int page, int size, String sortBy, String sortDir) {
+        Sort sort = sortDir.equalsIgnoreCase("desc") ? Sort.by(sortBy).descending() : Sort.by(sortBy).ascending();
+        Page<ProductResponse> result = productRepository.findAll(PageRequest.of(page, size, sort))
+            .map(this::toResponse);
+        return new PageResponse<>(result.getContent(), result.getNumber(), result.getSize(),
+            result.getTotalElements(), result.getTotalPages(), result.isLast());
     }
 
     @Override
